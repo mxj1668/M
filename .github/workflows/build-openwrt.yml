@@ -16,14 +16,6 @@ on:
         description: 'SSH远程'
         required: true
         default: 'ssh-actions'
-      wxtz:
-        description: '微信通知'
-        required: false
-        default: 'wxtz-actions'
-      release:
-        description: '发布固件'
-        required: false
-        default: 'release-actions'
 
 
 #定时触发开始编译(开启定时编译请先确认SSH处在关闭状态,要不然SSH没人管,会卡SSH编译失败)
@@ -103,21 +95,26 @@ jobs:
     - name: 下载固件源码
       working-directory: /workdir
       run: |
-        df -hT $PWD
         git clone -b $REPO_BRANCH --single-branch $REPO_URL openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
         
     - name: 加载源,patch补丁和自定义设置
       run: |
         cd openwrt
-        chmod +x $DIY_P1_SH
-        $GITHUB_WORKSPACE/$DIY_P1_SH
-        ./scripts/feeds clean && ./scripts/feeds update -a && ./scripts/feeds install -a
-        chmod +x $DIY_P2_SH
-        $GITHUB_WORKSPACE/$DIY_P2_SH
-        cp -Rf /diy/* ./
-        [ -e $CONFIG_FILE ]
-        mv $CONFIG_FILE .config
+        if [ -f "build/${{matrix.target}}/$DIY_P1_SH" ]; then
+          chmod +x build/${{matrix.target}}/$DIY_P1_SH
+          /bin/bash "build/${{matrix.target}}/$DIY_P1_SH"
+        fi
+         ./scripts/feeds clean && ./scripts/feeds update -a && ./scripts/feeds install -a
+        if [ -f "build/${{matrix.target}}/$DIY_P2_SH" ]; then
+          chmod +x build/${{matrix.target}}/$DIY_P2_SH
+          /bin/bash "build/${{matrix.target}}/$DIY_P2_SH"
+        fi
+        if [ -n "$(ls -A "build/${{matrix.target}}/diy" 2>/dev/null)" ]; then
+         cp -Rf build/${{matrix.target}}/diy/* ./
+        fi
+         [ -e build/${{matrix.target}}/$CONFIG_FILE ]
+         mv build/${{matrix.target}}/$CONFIG_FILE .config
         
     - name: SSH远程连接（运行到此必须刷新一次网页再等待代码展开,不能频繁刷新）
       uses: garypang13/debugger-action@master
